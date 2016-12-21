@@ -1,0 +1,188 @@
+Upstream mono supports cross compiling by first doing a native build of
+both C and C# code, and then a cross build of the C code only. To run on
+target, one then needs to deploy the cross built C binaries and "native"
+built C# objects.
+
+Deploying objects on target from native context violates the context
+separation, so patch the configure system to allow building C# code
+in a cross build.
+
+Upstream-status: inappropriate
+
+This patch has been ported from mono-4.3.2 to mono-4.2.2
+
+diff --git a/configure b/configure
+index 08afe9d..48d69a7 100755
+--- a/configure
++++ b/configure
+@@ -25595,7 +25595,6 @@ if test "x$host" != "x$target"; then
+ 
+ $as_echo "#define MONO_CROSS_COMPILE 1" >>confdefs.h
+ 
+-   enable_mcs_build=no
+    case "$target" in
+    arm*-darwin*)
+ 		TARGET=ARM;
+@@ -26774,15 +26773,6 @@ else
+ fi
+ 
+ 
+-if test x$cross_compiling = xyes -o x$enable_mcs_build = xno; then
+-   DISABLE_MCS_DOCS=yes
+-   with_profile4_5=no
+-   with_monodroid=no
+-   with_monotouch=no
+-   with_monotouch_watch=no
+-   with_xammac=no
+-fi
+-
+ if test x$DISABLE_MCS_DOCS = xyes; then
+    docs_dir=""
+ else
+@@ -26791,13 +26781,8 @@ fi
+ 
+ 
+ ## Maybe should also disable if mcsdir is invalid.  Let's punt the issue for now.
+- if test x$cross_compiling = xno && test x$enable_mcs_build != xno; then
+-  BUILD_MCS_TRUE=
+-  BUILD_MCS_FALSE='#'
+-else
+-  BUILD_MCS_TRUE='#'
+-  BUILD_MCS_FALSE=
+-fi
++BUILD_MCS_TRUE=
++BUILD_MCS_FALSE='#'
+ 
+ 
+  if test x$OPROFILE = xyes; then
+@@ -30452,84 +30437,67 @@ fi
+   NONE) exec_prefix='${prefix}' ;;
+   esac
+ 
+-  #
+-  # If we are cross compiling, we don't build in the mcs/ tree.  Let us not clobber
+-  # any existing config.make.  This allows people to share the same source tree
+-  # with different build directories, one native and one cross
+-  #
+-  if test x$cross_compiling = xno && test x$enable_mcs_build != xno; then
+-
+-    test -w $mcs_topdir/build || chmod +w $mcs_topdir/build
+-
+-    echo "prefix=$prefix" > $mcs_topdir/build/config.make
+-    echo "exec_prefix=$exec_prefix" >> $mcs_topdir/build/config.make
+-    echo "sysconfdir=$sysconfdir" >> $mcs_topdir/build/config.make
+-    echo 'mono_libdir=${exec_prefix}/lib' >> $mcs_topdir/build/config.make
+-    echo 'IL_FLAGS = /debug' >> $mcs_topdir/build/config.make
+-    echo "RUNTIME = $mono_build_root/runtime/mono-wrapper" >> $mcs_topdir/build/config.make
+-    echo "ILDISASM = $mono_build_root/runtime/monodis-wrapper" >> $mcs_topdir/build/config.make
+-    echo "JAY_CFLAGS = $JAY_CFLAGS" >> $mcs_topdir/build/config.make
+-
+-    case $INSTALL in
+-    [\\/$]* | ?:[\\/]* ) mcs_INSTALL=$INSTALL ;;
+-    *) mcs_INSTALL=$mono_build_root/$INSTALL ;;
+-    esac
++	test -w $mcs_topdir/build || chmod +w $mcs_topdir/build
+ 
+-    echo "INSTALL = $mcs_INSTALL" >> $mcs_topdir/build/config.make
++	echo "prefix=$prefix" > $mcs_topdir/build/config.make
++	echo "exec_prefix=$exec_prefix" >> $mcs_topdir/build/config.make
++	echo "sysconfdir=$sysconfdir" >> $mcs_topdir/build/config.make
++	echo 'mono_libdir=${exec_prefix}/lib' >> $mcs_topdir/build/config.make
++	echo 'IL_FLAGS = /debug' >> $mcs_topdir/build/config.make
++	echo "RUNTIME = $mono_build_root/runtime/mono-wrapper" >> $mcs_topdir/build/config.make
++	echo "ILDISASM = $mono_build_root/runtime/monodis-wrapper" >> $mcs_topdir/build/config.make
++	echo "JAY_CFLAGS = $JAY_CFLAGS" >> $mcs_topdir/build/config.make
+ 
+-    export VERSION
+-    myver=$($AWK 'BEGIN {
+-      split (ENVIRON["VERSION"] ".0.0.0", vsplit, ".")
+-      if(length(vsplit [1]) > 4) {
+-        split (substr(ENVIRON["VERSION"], 0, 4) "." substr(ENVIRON["VERSION"], 5) ".0.0", vsplit, ".")
+-      }
+-      print vsplit [1] "." vsplit [2] "." vsplit [3] "." vsplit [4]
+-    }')
++	case $INSTALL in
++	[\\/$]* | ?:[\\/]* ) mcs_INSTALL=$INSTALL ;;
++	*) mcs_INSTALL=$mono_build_root/$INSTALL ;;
++	esac
+ 
+-    echo "MONO_VERSION = $myver" >> $mcs_topdir/build/config.make
++	echo "INSTALL = $mcs_INSTALL" >> $mcs_topdir/build/config.make
+ 
+-    if test x$platform_darwin = xyes; then
+-      echo "PLATFORM = darwin" >> $mcs_topdir/build/config.make
+-    fi
++	export VERSION
++	myver=$($AWK 'BEGIN {
++		split (ENVIRON["VERSION"] ".0.0.0", vsplit, ".")
++		if(length(vsplit [1]) > 4) {
++			split (substr(ENVIRON["VERSION"], 0, 4) "." substr(ENVIRON["VERSION"], 5) ".0.0", vsplit, ".")
++		}
++		print vsplit [1] "." vsplit [2] "." vsplit [3] "." vsplit [4]
++	}')
+ 
+-	if test x$AOT_SUPPORTED = xyes -a x$enable_system_aot = xdefault; then
+-	   enable_system_aot=yes
++	echo "MONO_VERSION = $myver" >> $mcs_topdir/build/config.make
++
++	if test x$host_darwin = xyes; then
++		echo "PLATFORM = darwin" >> $mcs_topdir/build/config.make
+ 	fi
+ 
+-    if test x$host_win32 = xno -a x$enable_system_aot = xyes; then
+-      echo "ENABLE_AOT = 1" >> $mcs_topdir/build/config.make
+-    fi
++	if test x$AOT_SUPPORTED = xyes -a x$enable_system_aot = xdefault; then
++		enable_system_aot=yes
++	fi
+ 
+-    if test x$DISABLE_MCS_DOCS = xyes; then
+-      echo "DISABLE_MCS_DOCS = yes" >> $mcs_topdir/build/config.make
+-    fi
++	if test x$host_win32 = xno -a x$enable_system_aot = xyes; then
++		echo "ENABLE_AOT = 1" >> $mcs_topdir/build/config.make
++	fi
+ 
+-    if test x$has_extension_module != xno; then
+-        echo "EXTENSION_MODULE = 1" >> $srcdir/$mcsdir/build/config.make
+-    fi
+ 
+ 	default_profile=net_4_5
+-    if test -z "$INSTALL_MONODROID_TRUE"; then :
+-  		default_profile=monodroid
+-    fi
+-    if test -z "$INSTALL_MONOTOUCH_TRUE"; then :
+-  		default_profile=monotouch
+-    fi
++	if test -z "$INSTALL_MONODROID_TRUE"; then :
++		default_profile=monodroid
++	fi
++	if test -z "$INSTALL_MONOTOUCH_TRUE"; then :
++		default_profile=monotouch
++	fi
+ 	if test -z "$INSTALL_XAMMAC_TRUE"; then :
+-  		default_profile=xammac
++		default_profile=xammac
++	fi
++	if test -z "$INSTALL_4_5_TRUE"; then :
++		default_profile=net_4_5
+ 	fi
+-    if test -z "$INSTALL_4_5_TRUE"; then :
+-  		default_profile=net_4_5
+-    fi
+-
+-    echo "DEFAULT_PROFILE = $default_profile" >> $srcdir/$mcsdir/build/config.make
+-
+-    if test "x$test_bcl_opt" = "xyes"; then
+-      echo "BCL_OPTIMIZE = 1" >> $srcdir/$mcsdir/build/config.make
+-    fi
+ 
+-  fi
++	echo "DEFAULT_PROFILE = $default_profile" >> $srcdir/$mcsdir/build/config.make
+ 
++	if test "x$test_bcl_opt" = "xyes"; then
++		echo "BCL_OPTIMIZE = 1" >> $srcdir/$mcsdir/build/config.make
++	fi
+ )
+ 
+ libgdiplus_msg=${libgdiplus_loc:-assumed to be installed}
