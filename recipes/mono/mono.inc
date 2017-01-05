@@ -7,9 +7,13 @@ inherit auto-package-libs autotools c++
 # make the machine context depend on its native counter part to
 # enable bootstrapping
 DEPENDS = "libm libpthread librt libdl"
-DEPENDS:>machine = " native:mono native:mono-jay"
-SRC_URI = "http://download.mono-project.com/sources/mono/mono-${PV}.${SV}.tar.bz2"
+
+# mono bootstrap 
+DEPENDS:>machine = " native:mono-${PV} native:mono-jay-${PV}"
+SRC_URI = " http://download.mono-project.com/sources/mono/mono-${PV}.${SV}.tar.bz2"
 SRC_URI:>machine = " file://enable-cross-mcs-build.patch"
+
+PROVIDES_${PN} += "mono-${PV} mono"
 
 # enable X11 if configured so by distro/machine
 RECIPE_FLAGS = "x11"
@@ -165,6 +169,7 @@ FILES_${PN}-libmonoposixhelper-dev = "${libdir}/libMonoPosixHelper.a ${libdir}/l
 # create a native package for the jay binary and
 # install that binary into it
 PACKAGES:<native = "${PN}-jay "
+PROVIDES_${PN}-jay = "${PN}-jay-${PV}"
 FILES_${PN}-jay:native = "${bindir}/jay"
 DO_INSTALL_JAY = ""
 DO_INSTALL_JAY:native = "do_install_jay"
